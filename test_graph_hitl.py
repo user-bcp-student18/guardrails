@@ -19,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import graph.nodes as nodes
+from agents import architect, backend, chapter, frontend, security, testing
 from graph.graph import graph, NODES, MAX_REVIEW_ROUNDS
 
 
@@ -26,12 +27,12 @@ class Stub:
     """Reemplaza a nodes._invoke. Guarda prompts y guiona al chapter."""
 
     ROLES = [
-        ("Eres el arquitecto de software del equipo", "architect"),
-        ("Eres un desarrollador backend",   "backend"),
-        ("Eres un desarrollador frontend/API",     "frontend"),
-        ("Eres el Ingeniero de pruebas", "testing"),
-        ("Eres el Revisor de seguridad", "security"),
-        ("Eres el Chapter del equipo",           "chapter"),
+        (architect.INSTRUCTIONS, "architect"),
+        (backend.INSTRUCTIONS, "backend"),
+        (frontend.INSTRUCTIONS, "frontend"),
+        (testing.INSTRUCTIONS, "testing"),
+        (security.INSTRUCTIONS, "security"),
+        (chapter.INSTRUCTIONS, "chapter"),
     ]
 
     def __init__(self, veredictos):
@@ -40,7 +41,7 @@ class Stub:
         self.veredictos = list(veredictos)
 
     def __call__(self, prompt: str) -> str:
-        rol = next((r for marca, r in self.ROLES if marca in prompt), None)
+        rol = next((r for marca, r in self.ROLES if prompt.startswith(marca)), None)
         assert rol, f"prompt sin rol reconocible: {prompt[:90]!r}"
         self.calls.append(rol)
         self.prompts.append((rol, prompt))
@@ -86,6 +87,15 @@ def correr_todo(cfg, tope=40):
             return
         graph.invoke(None, cfg)
     raise AssertionError("el pipeline no termino dentro del tope de pasos")
+
+
+def test_stub_reconoce_roles_por_prefijo():
+    stub = Stub(["APROBADO"])
+    for instructions, role in Stub.ROLES:
+        stub(instructions + "\nSnapshot:\n" + architect.INSTRUCTIONS)
+        assert stub.calls[-1] == role, f"rol incorrecto para {role}"
+    assert stub.calls == NODES
+    print("Stub: roles actuales reconocidos sin confundir el contexto  OK")
 
 
 def test_hitl_un_nodo_por_invoke():
@@ -172,6 +182,7 @@ def test_salta_por_project_type():
 
 
 def main():
+    test_stub_reconoce_roles_por_prefijo()
     test_hitl_un_nodo_por_invoke()
     test_review_loop()
     test_feedback_llega_al_dev()
